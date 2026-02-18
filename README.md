@@ -3,6 +3,8 @@
   <img src="https://img.shields.io/badge/Architecture-Lock--Free-brightgreen?style=for-the-badge" />
   <img src="https://img.shields.io/badge/Allocation-Zero--Alloc_Hot_Path-orange?style=for-the-badge" />
   <img src="https://img.shields.io/badge/Latency-%3C1μs-red?style=for-the-badge" />
+  <img src="https://img.shields.io/badge/Tests-25_Passing-success?style=for-the-badge" />
+  <img src="https://img.shields.io/badge/Benchmark-p99_Latency-blueviolet?style=for-the-badge" />
   <img src="https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge" />
 </p>
 
@@ -99,11 +101,26 @@ Un problema crítico en HFT es el **quote stuffing**: un actor malintencionado e
 
 ### Requisitos
 - Compilador C++20 compatible (GCC 11+, Clang 14+, MSVC 2022+)
+- CMake 3.20+ (opcional, para build system)
 - Sistema operativo: Linux, macOS o Windows (con WSL recomendado)
 
-### Compilar
+### Compilación directa
 ```bash
+# Motor principal
 g++ -std=c++20 -O2 -Wall -Wextra -pthread hyper_core_engine.cpp -o hyper_core_engine
+
+# Unit tests
+g++ -std=c++20 -O2 -Wall -Wextra -pthread tests/test_hyper_core.cpp -o test_hyper_core
+
+# Benchmark de latencia
+g++ -std=c++20 -O2 -Wall -Wextra -pthread benchmarks/benchmark_latency.cpp -o benchmark_latency
+```
+
+### Compilación con CMake
+```bash
+mkdir build && cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+cmake --build .
 ```
 
 ### Ejecutar
@@ -139,6 +156,52 @@ g++ -std=c++20 -O2 -Wall -Wextra -pthread hyper_core_engine.cpp -o hyper_core_en
 ================================================================
 ```
 
+## 🧪 Tests Unitarios
+
+**25 test cases** verifican la corrección de cada componente:
+
+| Componente | Tests | Qué verifica |
+|------------|-------|--------------|
+| Order | 3 | Tamaño 64B, trivially copyable, `next` es null |
+| MemoryArena | 4 | Alocación, tracking, reset, alineación |
+| ObjectPool | 4 | Acquire, release, reciclaje, agotamiento |
+| RingBuffer | 3 | Vacío, push/pop, pop en vacío falla |
+| IntrusiveOrderList | 5 | Push, match FIFO, skip inactivos, compact, **capacidad ilimitada (5000 órdenes sin malloc)** |
+| PriceLevel | 2 | Add + match, cancel con reduce_qty |
+| OrderBook | 4 | Limit orders, cancel, crossing orders, market orders |
+
+```bash
+./test_hyper_core
+
+# Salida esperada:
+# ══════════════════════════════════════════
+#   Hyper-Core HFT Engine — Unit Tests
+# ══════════════════════════════════════════
+#   ▸ Order_is_cache_line_sized... ✓ PASSED
+#   ▸ IntrusiveList_unbounded_capacity_no_malloc... ✓ PASSED
+#   ...
+#   Results: 25/25 passed
+# ══════════════════════════════════════════
+```
+
+## 📈 Benchmark de Latencia
+
+Mide latencia con precisión de nanosegundos de cada operación crítica:
+
+| Benchmark | Operación | Muestras |
+|-----------|-----------|----------|
+| ObjectPool | acquire + release | 100K |
+| RingBuffer | push + pop | 100K |
+| **IntrusiveOrderList** | **push_back (100K orders)** | **100K** |
+| PriceLevel | add_order / match | 50K |
+| Full Pipeline | add(bid) + add(ask) + match | 50K |
+
+Reporta **p50, p99, p99.9, min, max y media** en nanosegundos. Incluye una verificación de **consistencia de tiempo constante** comparando la latencia de las primeras 1K vs las últimas 1K operaciones.
+
+```bash
+./benchmark_latency
+```
+
 ## 📊 Métricas de Rendimiento
 
 | Métrica | Objetivo | Estado |
@@ -148,6 +211,7 @@ g++ -std=c++20 -O2 -Wall -Wextra -pthread hyper_core_engine.cpp -o hyper_core_en
 | Alocaciones en hot path | 0 | ✅ |
 | Lock-free communication | Sí | ✅ |
 | Afinidad de CPU | Core dedicado | ✅ |
+| Unit tests | 25/25 passing | ✅ |
 
 ## 🧠 Conceptos Técnicos Demostrados
 
@@ -160,6 +224,23 @@ g++ -std=c++20 -O2 -Wall -Wextra -pthread hyper_core_engine.cpp -o hyper_core_en
 - **CPU pinning** — Afinidad de hilo a core específico
 - **Fixed-point arithmetic** — Precios sin errores de punto flotante
 - **SPSC patterns** — Ring buffer sin contención
+- **Micro-benchmarking** — Medición de latencia con percentiles (p50/p99/p99.9)
+- **CMake build system** — Build multiplataforma con CTest
+
+## 📁 Estructura del Proyecto
+
+```
+hyper-core-engine/
+├── hyper_core_engine.cpp       # Motor completo (1290 líneas)
+├── tests/
+│   └── test_hyper_core.cpp     # 25 unit tests
+├── benchmarks/
+│   └── benchmark_latency.cpp   # Benchmark de latencia con percentiles
+├── CMakeLists.txt              # Build system (CMake 3.20+)
+├── README.md                   # Documentación bilingüe ES/EN
+├── LICENSE                     # MIT License
+└── .gitignore
+```
 
 ---
 
@@ -234,17 +315,62 @@ A critical problem in HFT is **quote stuffing**: a malicious actor sends thousan
 
 ### Requirements
 - C++20 compatible compiler (GCC 11+, Clang 14+, MSVC 2022+)
+- CMake 3.20+ (optional, for build system)
 - OS: Linux, macOS, or Windows (WSL recommended)
 
-### Build
+### Direct Build
 ```bash
+# Main engine
 g++ -std=c++20 -O2 -Wall -Wextra -pthread hyper_core_engine.cpp -o hyper_core_engine
+
+# Unit tests
+g++ -std=c++20 -O2 -Wall -Wextra -pthread tests/test_hyper_core.cpp -o test_hyper_core
+
+# Latency benchmark
+g++ -std=c++20 -O2 -Wall -Wextra -pthread benchmarks/benchmark_latency.cpp -o benchmark_latency
+```
+
+### CMake Build
+```bash
+mkdir build && cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+cmake --build .
 ```
 
 ### Run
 ```bash
-./hyper_core_engine
+./hyper_core_engine     # Main engine
+./test_hyper_core       # Unit tests (25 cases)
+./benchmark_latency     # Latency benchmark (p50/p99/p99.9)
 ```
+
+## 🧪 Unit Tests
+
+**25 test cases** verify correctness of every component:
+
+| Component | Tests | What it verifies |
+|-----------|-------|------------------|
+| Order | 3 | 64B size, trivially copyable, `next` is null |
+| MemoryArena | 4 | Allocation, tracking, reset, alignment |
+| ObjectPool | 4 | Acquire, release, recycling, exhaustion |
+| RingBuffer | 3 | Empty, push/pop, pop-on-empty fails |
+| IntrusiveOrderList | 5 | Push, FIFO match, skip inactive, compact, **unbounded capacity (5000 orders, zero malloc)** |
+| PriceLevel | 2 | Add + match, cancel with reduce_qty |
+| OrderBook | 4 | Limit orders, cancel, crossing orders, market orders |
+
+## 📈 Latency Benchmark
+
+Measures nanosecond-precision latency of every critical operation:
+
+| Benchmark | Operation | Samples |
+|-----------|-----------|----------|
+| ObjectPool | acquire + release | 100K |
+| RingBuffer | push + pop | 100K |
+| **IntrusiveOrderList** | **push_back (100K orders)** | **100K** |
+| PriceLevel | add_order / match | 50K |
+| Full Pipeline | add(bid) + add(ask) + match | 50K |
+
+Reports **p50, p99, p99.9, min, max, and mean** in nanoseconds. Includes a **constant-time consistency check** comparing first 1K vs last 1K operation latencies.
 
 ## 📊 Performance Metrics
 
@@ -255,6 +381,7 @@ g++ -std=c++20 -O2 -Wall -Wextra -pthread hyper_core_engine.cpp -o hyper_core_en
 | Hot path allocations | 0 | ✅ |
 | Lock-free communication | Yes | ✅ |
 | CPU affinity | Dedicated core | ✅ |
+| Unit tests | 25/25 passing | ✅ |
 
 ## 🧠 Technical Concepts Demonstrated
 
@@ -267,6 +394,8 @@ g++ -std=c++20 -O2 -Wall -Wextra -pthread hyper_core_engine.cpp -o hyper_core_en
 - **CPU pinning** — Thread-to-core affinity
 - **Fixed-point arithmetic** — Prices without floating-point errors
 - **SPSC patterns** — Contention-free ring buffer
+- **Micro-benchmarking** — Latency measurement with percentiles (p50/p99/p99.9)
+- **CMake build system** — Cross-platform build with CTest
 
 ---
 

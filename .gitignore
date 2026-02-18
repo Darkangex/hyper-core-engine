@@ -27,3 +27,6 @@ desktop.ini
 # Debug
 *.dSYM/
 *.pdb
+
+compile_log.txt
+run_output.txt

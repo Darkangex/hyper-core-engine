@@ -65,7 +65,6 @@
 #include <new>
 #include <random>
 
-
 #include <thread>
 #include <type_traits>
 #include <vector>
@@ -1209,6 +1208,8 @@ inline void print_report(const EngineStats &stats, double elapsed_seconds,
 //  15. MAIN — Orchestration
 // ═══════════════════════════════════════════════════════════════════════
 
+#ifndef HYPER_CORE_NO_MAIN // Allow tests/benchmarks to exclude main()
+
 int main() {
   using namespace std::chrono;
 
@@ -1285,3 +1286,5 @@ int main() {
 
   return 0;
 }
+
+#endif // HYPER_CORE_NO_MAIN
